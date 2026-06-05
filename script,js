@@ -1,0 +1,119 @@
+const addBtn = document.getElementById("addBtn");
+const processBtn = document.getElementById("processBtn");
+const tableBody = document.getElementById("tableBody");
+const autoName = document.getElementById("autoName");
+
+let entries = [];
+
+addBtn.addEventListener("click", () => {
+
+    const pageRange = document.getElementById("pageRange").value.trim();
+    const fileName = document.getElementById("fileName").value.trim();
+
+    if (!pageRange) {
+        alert("Enter page range");
+        return;
+    }
+
+    entries.push({
+        range: pageRange,
+        name: fileName
+    });
+
+    let row = `
+    <tr>
+        <td>${pageRange}</td>
+        <td>${fileName || "Auto Name"}</td>
+    </tr>
+    `;
+
+    tableBody.innerHTML += row;
+
+    document.getElementById("pageRange").value = "";
+    document.getElementById("fileName").value = "";
+
+});
+
+processBtn.addEventListener("click", async () => {
+
+    const fileInput = document.getElementById("pdfFile");
+
+    if (!fileInput.files.length) {
+        alert("Upload PDF first");
+        return;
+    }
+
+    const file = fileInput.files[0];
+    const bytes = await file.arrayBuffer();
+
+    const pdfDoc = await PDFLib.PDFDocument.load(bytes);
+
+    let count = 1;
+
+    for (const item of entries) {
+
+        let newPdf = await PDFLib.PDFDocument.create();
+
+        let pages = [];
+
+        let parts = item.range.split(",");
+
+        for (let p of parts) {
+
+            if (p.includes("-")) {
+
+                let [start, end] = p.split("-").map(Number);
+
+                for (let i = start; i <= end; i++) {
+                    pages.push(i - 1);
+                }
+
+            } else {
+
+                pages.push(Number(p) - 1);
+
+            }
+
+        }
+
+        const copiedPages =
+            await newPdf.copyPages(pdfDoc, pages);
+
+        copiedPages.forEach(page => newPdf.addPage(page));
+
+        const pdfBytes = await newPdf.save();
+
+        let filename;
+
+        if (autoName.checked) {
+            filename = count + ".pdf";
+        } else {
+            filename = (item.name || count) + ".pdf";
+        }
+
+        downloadPDF(pdfBytes, filename);
+
+        count++;
+    }
+
+});
+
+function downloadPDF(pdfBytes, filename) {
+
+    const blob = new Blob(
+        [pdfBytes],
+        { type: "application/pdf" }
+    );
+
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+
+    a.href = url;
+    a.download = filename;
+
+    a.click();
+
+    URL.revokeObjectURL(url);
+
+}
